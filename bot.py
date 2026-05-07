@@ -131,10 +131,27 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/start — pornește botul și începe o conversație nouă\n"
         "/reset — șterge istoricul și începe o conversație nouă\n"
         "/models — schimbă modelul AI (Sonnet, Opus, Haiku)\n"
+        "/tools — afișează uneltele disponibile\n"
         "/help — afișează această listă\n"
         "/myid — afișează ID-ul tău Telegram\n\n"
         "Poți trimite și fișiere sau imagini cu un mesaj opțional."
     )
+
+
+async def tools_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_allowed(update.effective_user.id):
+        await request_access(update, context)
+        return
+    chat_id = update.effective_chat.id
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    response = await call_claude(
+        "List all tools you have available right now. "
+        "Group them by category, one per line, format: `tool_name` — short description. "
+        "Be concise. No intro text, just the list.",
+        chat_id,
+    )
+    for i in range(0, max(len(response), 1), 4096):
+        await update.message.reply_text(response[i : i + 4096])
 
 
 async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -269,6 +286,7 @@ def main() -> None:
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("tools", tools_cmd))
     app.add_handler(CommandHandler("myid", myid))
     app.add_handler(CommandHandler("reset", reset))
     app.add_handler(CommandHandler("models", models_cmd))
