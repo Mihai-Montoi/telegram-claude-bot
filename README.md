@@ -14,7 +14,7 @@ The bot calls the `claude` CLI as a subprocess. Each Telegram chat has its own i
 
 - Linux (Debian/Ubuntu recommended)
 - Python 3.10+
-- Node.js (for Claude Code)
+- `curl`
 - A Telegram bot token (from [@BotFather](https://t.me/BotFather))
 - A Claude Code account ([claude.ai/code](https://claude.ai/code))
 
@@ -28,7 +28,7 @@ chmod +x setup.sh
 ```
 
 The script automatically:
-1. Installs Claude Code (`npm install -g @anthropic-ai/claude-code`)
+1. Installs Claude Code via the official installer (`curl -fsSL https://claude.ai/install.sh | bash`)
 2. Creates a Python virtual environment and installs dependencies
 3. Installs and enables a systemd service (auto-start on reboot)
 
@@ -37,7 +37,7 @@ The script automatically:
 ### 1. Claude Code
 
 ```bash
-npm install -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash
 claude login
 ```
 
