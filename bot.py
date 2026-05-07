@@ -23,6 +23,19 @@ ADMIN_USER_ID: int = int(os.environ["ADMIN_USER_ID"])
 SESSIONS_DIR = Path.home() / ".telegram_bot"
 fresh_chats: set[int] = set()
 
+AVAILABLE_MODELS = {
+    "sonnet": ("claude-sonnet-4-6", "Sonnet 4.6 — echilibrat (implicit)"),
+    "opus":   ("claude-opus-4-7",   "Opus 4.7 — cel mai capabil, mai lent"),
+    "haiku":  ("claude-haiku-4-5-20251001", "Haiku 4.5 — cel mai rapid"),
+}
+DEFAULT_MODEL = "claude-sonnet-4-6"
+
+chat_models: dict[int, str] = {}
+
+
+def get_model(chat_id: int) -> str:
+    return chat_models.get(chat_id, DEFAULT_MODEL)
+
 
 def chat_dir(chat_id: int) -> Path:
     d = SESSIONS_DIR / str(chat_id)
@@ -43,8 +56,9 @@ def save_allowed_users() -> None:
 async def call_claude(message: str, chat_id: int) -> str:
     cwd = chat_dir(chat_id)
     is_fresh = chat_id in fresh_chats
+    model = get_model(chat_id)
 
-    cmd = ["claude"]
+    cmd = ["claude", "--model", model]
     if not is_fresh:
         cmd.append("--continue")
     cmd.extend(["-p", message])
@@ -101,7 +115,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Salut! Sunt Claude Code, rulând local pe serverul tău.\n"
         "Pot executa comenzi, citi fișiere, scrie cod și orice altceva.\n\n"
-        "/reset — începe o conversație nouă"
+        "/reset — începe o conversație nouă\n"
+        "/model — schimbă modelul AI"
     )
 
 
@@ -116,11 +131,52 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Conversație nouă pornită.")
 
 
-async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def model_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_allowed(update.effective_user.id):
+        return
+    chat_id = update.effective_chat.id
+    current = get_model(chat_id)
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            f"{'✅ ' if model_id == current else ''}{desc}",
+            callback_data=f"model:{key}"
+        )]
+        for key, (model_id, desc) in AVAILABLE_MODELS.items()
+    ])
+
+    await update.message.reply_text("Alege modelul AI:", reply_markup=keyboard)
+
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
 
-    action, user_id_str = query.data.split(":", 1)
+    data = query.data
+
+    if data.startswith("model:"):
+        if not is_allowed(query.from_user.id):
+            return
+        key = data.split(":", 1)[1]
+        if key not in AVAILABLE_MODELS:
+            return
+        chat_id = query.message.chat.id
+        model_id, desc = AVAILABLE_MODELS[key]
+        chat_models[chat_id] = model_id
+        fresh_chats.add(chat_id)
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(
+                f"{'✅ ' if mid == model_id else ''}{d}",
+                callback_data=f"model:{k}"
+            )]
+            for k, (mid, d) in AVAILABLE_MODELS.items()
+        ])
+        await query.edit_message_text(f"Model setat: {desc}\n\nConversație nouă pornită.", reply_markup=keyboard)
+        return
+
+    # approval callbacks
+    action, user_id_str = data.split(":", 1)
     user_id = int(user_id_str)
 
     if action == "approve":
@@ -197,7 +253,8 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("myid", myid))
     app.add_handler(CommandHandler("reset", reset))
-    app.add_handler(CallbackQueryHandler(handle_approval))
+    app.add_handler(CommandHandler("model", model_cmd))
+    app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
