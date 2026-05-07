@@ -6,16 +6,16 @@ echo ""
 
 # ── 1. Claude Code ────────────────────────────────────────────────
 if ! command -v claude &>/dev/null; then
-    echo "[1/4] Installing Claude Code..."
+    echo "[1/5] Installing Claude Code..."
     curl -fsSL https://claude.ai/install.sh | bash
     # reload PATH so claude is available in this session
     export PATH="$HOME/.local/bin:$PATH"
 else
-    echo "[1/4] Claude Code already installed."
+    echo "[1/5] Claude Code already installed."
 fi
 
 # ── 2. Python venv ────────────────────────────────────────────────
-echo "[2/4] Setting up Python virtual environment..."
+echo "[2/5] Setting up Python virtual environment..."
 
 PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 
@@ -30,7 +30,7 @@ python3 -m venv .venv
 echo "    Dependencies installed."
 
 # ── 3. .env ───────────────────────────────────────────────────────
-echo "[3/4] Configuration..."
+echo "[3/5] Configuration..."
 
 if [ ! -f .env ]; then
     cp .env.example .env
@@ -47,8 +47,16 @@ else
     echo "    .env already exists, skipping."
 fi
 
-# ── 4. systemd service ────────────────────────────────────────────
-echo "[4/4] Installing systemd service..."
+# ── 4. MCP Telegram plugin (server.ts) ───────────────────────────
+echo "[4/5] Installing MCP Telegram plugin..."
+
+PLUGIN_DIR="$HOME/.claude/plugins/marketplaces/claude-plugins-official/external_plugins/telegram"
+mkdir -p "$PLUGIN_DIR"
+cp server.ts "$PLUGIN_DIR/server.ts"
+echo "    Installed to $PLUGIN_DIR/server.ts"
+
+# ── 5. systemd service ────────────────────────────────────────────
+echo "[5/5] Installing systemd service..."
 
 if ! command -v systemctl &>/dev/null; then
     echo "    systemd not available — skipping service install."
