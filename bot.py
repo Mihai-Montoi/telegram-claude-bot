@@ -24,17 +24,19 @@ SESSIONS_DIR = Path.home() / ".telegram_bot"
 fresh_chats: set[int] = set()
 
 AVAILABLE_MODELS = {
-    "sonnet": ("claude-sonnet-4-6",          "Sonnet 4.6 — echilibrat (implicit)"),
+    "sonnet": ("claude-sonnet-4-6",          "Sonnet 4.6 — echilibrat"),
     "opus":   ("claude-opus-4-7",            "Opus 4.7 — cel mai capabil, mai lent"),
-    "haiku":  ("claude-haiku-4-5-20251001",  "Haiku 4.5 — cel mai rapid, mai ieftin"),
+    "haiku":  ("claude-haiku-4-5-20251001",  "Haiku 4.5 — cel mai rapid, mai ieftin (implicit)"),
 }
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL_ADMIN = "claude-sonnet-4-6"
+DEFAULT_MODEL_USER  = "claude-haiku-4-5-20251001"
 
 chat_models: dict[int, str] = {}
 
 
 def get_model(chat_id: int) -> str:
-    return chat_models.get(chat_id, DEFAULT_MODEL)
+    default = DEFAULT_MODEL_ADMIN if chat_id == ADMIN_USER_ID else DEFAULT_MODEL_USER
+    return chat_models.get(chat_id, default)
 
 
 def chat_dir(chat_id: int) -> Path:
