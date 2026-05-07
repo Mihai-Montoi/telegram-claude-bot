@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import subprocess
@@ -19,10 +20,7 @@ ALLOWED_USER_IDS: set[int] = set(
 
 ADMIN_USER_ID: int = int(os.environ["ADMIN_USER_ID"])
 
-# Fiecare chat are propriul director — conversațiile sunt izolate
 SESSIONS_DIR = Path.home() / ".telegram_bot"
-
-# Chat-uri care au primit /reset și trebuie să înceapă sesiune nouă
 fresh_chats: set[int] = set()
 
 
@@ -42,7 +40,7 @@ def save_allowed_users() -> None:
     ENV_FILE.write_text(content)
 
 
-def call_claude(message: str, chat_id: int) -> str:
+async def call_claude(message: str, chat_id: int) -> str:
     cwd = chat_dir(chat_id)
     is_fresh = chat_id in fresh_chats
 
@@ -54,14 +52,16 @@ def call_claude(message: str, chat_id: int) -> str:
     if is_fresh:
         fresh_chats.discard(chat_id)
 
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=180,
-        cwd=str(cwd),
-    )
+    def _run() -> subprocess.CompletedProcess:
+        return subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            cwd=str(cwd),
+        )
 
+    result = await asyncio.to_thread(_run)
     return result.stdout.strip() or result.stderr.strip() or "(fără răspuns)"
 
 
@@ -131,6 +131,45 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await context.bot.send_message(chat_id=user_id, text="❌ Cererea ta de acces a fost respinsă.")
 
 
+async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_allowed(update.effective_user.id):
+        await request_access(update, context)
+        return
+
+    chat_id = update.effective_chat.id
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+
+    msg = update.message
+    caption = msg.caption or ""
+
+    try:
+        if msg.photo:
+            file = await context.bot.get_file(msg.photo[-1].file_id)
+            ext = "jpg"
+        elif msg.document:
+            file = await context.bot.get_file(msg.document.file_id)
+            ext = Path(msg.document.file_name or "file").suffix.lstrip(".") or "bin"
+        else:
+            return
+
+        dest = chat_dir(chat_id) / f"upload_{file.file_unique_id}.{ext}"
+        await file.download_to_drive(dest)
+
+        prompt = f"Am primit un fișier salvat la: {dest}\n"
+        if caption:
+            prompt += f"Mesajul utilizatorului: {caption}\n"
+        prompt += "Te rog să-l analizezi."
+
+        response = await call_claude(prompt, chat_id)
+        for i in range(0, max(len(response), 1), 4096):
+            await msg.reply_text(response[i : i + 4096])
+
+    except subprocess.TimeoutExpired:
+        await msg.reply_text("Timeout — procesarea a durat prea mult.")
+    except Exception as e:
+        await msg.reply_text(f"Eroare: {e}")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_allowed(update.effective_user.id):
         await request_access(update, context)
@@ -142,7 +181,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
     try:
-        response = call_claude(user_text, chat_id)
+        response = await call_claude(user_text, chat_id)
         for i in range(0, max(len(response), 1), 4096):
             await update.message.reply_text(response[i : i + 4096])
     except subprocess.TimeoutExpired:
@@ -157,6 +196,7 @@ def main() -> None:
     app.add_handler(CommandHandler("myid", myid))
     app.add_handler(CommandHandler("reset", reset))
     app.add_handler(CallbackQueryHandler(handle_approval))
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("Bot pornit. Ctrl+C pentru oprire.")
