@@ -62,6 +62,8 @@ async def call_claude(message: str, chat_id: int) -> str:
         )
 
     result = await asyncio.to_thread(_run)
+    if result.returncode == 143:
+        return result.stdout.strip() or "Comandă executată (conexiunea a fost întreruptă)."
     return result.stdout.strip() or result.stderr.strip() or "(fără răspuns)"
 
 
