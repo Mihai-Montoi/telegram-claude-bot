@@ -24,9 +24,9 @@ SESSIONS_DIR = Path.home() / ".telegram_bot"
 fresh_chats: set[int] = set()
 
 AVAILABLE_MODELS = {
-    "sonnet": ("claude-sonnet-4-6", "Sonnet 4.6 — echilibrat (implicit)"),
-    "opus":   ("claude-opus-4-7",   "Opus 4.7 — cel mai capabil, mai lent"),
-    "haiku":  ("claude-haiku-4-5-20251001", "Haiku 4.5 — cel mai rapid"),
+    "sonnet": ("claude-sonnet-4-6",          "Sonnet 4.6 — echilibrat (implicit)"),
+    "opus":   ("claude-opus-4-7",            "Opus 4.7 — cel mai capabil, mai lent"),
+    "haiku":  ("claude-haiku-4-5-20251001",  "Haiku 4.5 — cel mai rapid, mai ieftin"),
 }
 DEFAULT_MODEL = "claude-sonnet-4-6"
 
@@ -116,7 +116,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Salut! Sunt Claude Code, rulând local pe serverul tău.\n"
         "Pot executa comenzi, citi fișiere, scrie cod și orice altceva.\n\n"
         "/reset — începe o conversație nouă\n"
-        "/model — schimbă modelul AI"
+        "/models — schimbă modelul AI"
     )
 
 
@@ -131,7 +131,7 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Conversație nouă pornită.")
 
 
-async def model_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def models_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_allowed(update.effective_user.id):
         return
     chat_id = update.effective_chat.id
@@ -253,7 +253,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("myid", myid))
     app.add_handler(CommandHandler("reset", reset))
-    app.add_handler(CommandHandler("model", model_cmd))
+    app.add_handler(CommandHandler("models", models_cmd))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
