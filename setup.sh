@@ -7,16 +7,19 @@ echo ""
 # ── 1. Claude Code ────────────────────────────────────────────────
 if ! command -v claude &>/dev/null; then
     echo "[1/4] Installing Claude Code..."
-    npm install -g @anthropic-ai/claude-code
+    curl -fsSL https://claude.ai/install.sh | bash
+    # reload PATH so claude is available in this session
+    export PATH="$HOME/.local/bin:$PATH"
 else
-    echo "[1/4] Claude Code already installed: $(claude --version 2>/dev/null || echo 'ok')"
+    echo "[1/4] Claude Code already installed."
 fi
 
 # ── 2. Python venv ────────────────────────────────────────────────
 echo "[2/4] Setting up Python virtual environment..."
 
-if ! python3 -m venv --help &>/dev/null; then
-    PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+
+if ! python3 -m venv --help &>/dev/null 2>&1; then
     echo "    Installing python${PYTHON_VER}-venv..."
     sudo apt install -y "python${PYTHON_VER}-venv"
 fi
@@ -32,9 +35,9 @@ echo "[3/4] Configuration..."
 if [ ! -f .env ]; then
     cp .env.example .env
     echo ""
-    echo "    Edit .env and add your Telegram bot token:"
-    echo "    - Get a token from @BotFather on Telegram"
-    echo "    - Get your user ID from @userinfobot on Telegram"
+    echo "    Edit .env with your credentials:"
+    echo "      TELEGRAM_BOT_TOKEN  — from @BotFather on Telegram"
+    echo "      ALLOWED_USER_IDS    — from @userinfobot on Telegram"
     echo ""
     read -p "    Open .env now? [Y/n] " ans
     if [[ "$ans" != "n" && "$ans" != "N" ]]; then
@@ -47,19 +50,24 @@ fi
 # ── 4. systemd service ────────────────────────────────────────────
 echo "[4/4] Installing systemd service..."
 
-USER=$(whoami)
-DIR=$(pwd)
-sed "s|YOUR_USER|$USER|g; s|/home/$USER/telegram-claude-bot|$DIR|g" \
-    telegram-bot.service > /tmp/telegram-bot.service
+if ! command -v systemctl &>/dev/null; then
+    echo "    systemd not available — skipping service install."
+    echo "    Run manually: .venv/bin/python bot.py"
+else
+    USER_NAME=$(whoami)
+    DIR=$(pwd)
+    sed "s|YOUR_USER|$USER_NAME|g; s|/home/$USER_NAME/telegram-claude-bot|$DIR|g" \
+        telegram-bot.service > /tmp/telegram-bot.service
 
-sudo cp /tmp/telegram-bot.service /etc/systemd/system/telegram-bot.service
-sudo systemctl daemon-reload
-sudo systemctl enable telegram-bot
-sudo systemctl restart telegram-bot
+    sudo cp /tmp/telegram-bot.service /etc/systemd/system/telegram-bot.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable telegram-bot
+    sudo systemctl restart telegram-bot
 
-echo ""
-echo "=== Done! ==="
-echo ""
-echo "Bot status:  sudo systemctl status telegram-bot"
-echo "Logs:        sudo journalctl -u telegram-bot -f"
-echo "Restart:     sudo systemctl restart telegram-bot"
+    echo ""
+    echo "=== Done! ==="
+    echo ""
+    echo "Bot status:  sudo systemctl status telegram-bot"
+    echo "Logs:        sudo journalctl -u telegram-bot -f"
+    echo "Restart:     sudo systemctl restart telegram-bot"
+fi
