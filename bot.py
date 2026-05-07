@@ -120,6 +120,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_allowed(update.effective_user.id):
+        await request_access(update, context)
+        return
+    await update.message.reply_text(
+        "Comenzi disponibile:\n\n"
+        "/start — pornește botul și începe o conversație nouă\n"
+        "/reset — șterge istoricul și începe o conversație nouă\n"
+        "/models — schimbă modelul AI (Sonnet, Opus, Haiku)\n"
+        "/help — afișează această listă\n"
+        "/myid — afișează ID-ul tău Telegram\n\n"
+        "Poți trimite și fișiere sau imagini cu un mesaj opțional."
+    )
+
+
 async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f"User ID: `{update.effective_user.id}`", parse_mode="Markdown")
 
@@ -251,6 +266,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 def main() -> None:
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("myid", myid))
     app.add_handler(CommandHandler("reset", reset))
     app.add_handler(CommandHandler("models", models_cmd))
